@@ -2,13 +2,12 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:18.3-alpine
-    container_name: task-engine-db
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: green_user
       POSTGRES_PASSWORD: green_password
       POSTGRES_DB: task_engine
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Automatically run our init.sql on first boot
@@ -24,18 +23,18 @@ services:
       start_period: 10s # Gives Postgres time to do its initial boot
     networks:
       - task_network
+    restart: unless-stopped
 
   # RabbitMQ Message Broker (with Management UI)
   rabbitmq:
     image: rabbitmq:4.2-management-alpine
-    container_name: task-engine-mq
+    ports:
+      - "5672:5672" # AMQP protocol port
+      - "15672:15672" # Management UI port
     environment:
       RABBITMQ_DEFAULT_USER: green_user
       RABBITMQ_DEFAULT_PASS: green_password
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbitmq_management load_definitions "/etc/rabbitmq/definitions.json"
-    ports:
-      - "5672:5672" # AMQP protocol port
-      - "15672:15672" # Management UI port
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
@@ -46,21 +45,25 @@ services:
       retries: 5
     networks:
       - task_network
+    restart: unless-stopped
 
+  # Debezium Server (CDC Connector)
   debezium:
-    # build:
-    #   context: ./infra/debezium
-    #   dockerfile: Dockerfile
     image: quay.io/debezium/server:3.4
-    container_name: task-engine-cdc
+    volumes:
+      - debezium_data:/debezium/data
+      - ./infra/debezium/application.properties:/debezium/config/application.properties
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    volumes:
-      - debezium_data:/debezium/data
-      - ./infra/debezium/application.properties:/debezium/config/application.properties
+    healthcheck:
+      test: ["CMD", "curl -f http://localhost:8080/q/health || exit 1"]
+      interval: 10s # How often to run the check
+      timeout: 10s # Maximum time allowed for the check to complete
+      retries: 5 # Number of consecutive failures before marking as unhealthy
+      start_period: 30s # Grace period for the container to start up
     networks:
       - task_network
     restart: unless-stopped
@@ -70,7 +73,6 @@ services:
     build:
       context: ./worker-node
       dockerfile: Dockerfile
-    container_name: task-engine-worker
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,6 +88,34 @@ services:
       MQ_PORT: 5672
       MQ_USER: green_user
       MQ_PASSWORD: green_password
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5" # Architectural constraint: Limit CPU usage to prevent overload
+          memory: 512M # Architectural constraint: Limit memory usage
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+    networks:
+      - task_network
+    restart: unless-stopped
+
+  # API Gateway (Spring Boot)
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: green_user
+      DB_PASSWORD: green_password
+      DB_NAME: task_engine
+    ports:
+      - "8080:8080"
     networks:
       - task_network
     restart: unless-stopped

@@ -36,13 +36,6 @@
         <java.version>25</java.version>
     </properties>
     <dependencies>
-        <dependency>
-            <groupId>tools.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>3.1.0</version>
-        </dependency>
-
-
         <!-- Web & Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -87,8 +80,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-json</artifactId>
         </dependency>
-    </dependencies>
 
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+    </dependencies>
     <build>
         <plugins>
             <plugin>
@@ -126,7 +124,6 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
-                        <phase>compile</phase>
                     </execution>
                 </executions>
             </plugin>
