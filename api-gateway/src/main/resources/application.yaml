@@ -28,16 +28,3 @@ spring:
       hibernate:
         type:
           "[json_format_mapper]": com.greennode.api_gateway.utilities.CustomHibernateJsonFormatter
-
-#   # RabbitMQ Configuration
-#   rabbitmq:
-#     host: ${MQ_HOST:localhost}
-#     port: ${MQ_PORT:5672}
-#     username: ${MQ_USER:green_user}
-#     password: ${MQ_PASSWORD:green_password}
-#     listener:
-#       simple:
-#         retry:
-#           enabled: true
-#           initial-interval: 1000ms
-#           max-retries: 3

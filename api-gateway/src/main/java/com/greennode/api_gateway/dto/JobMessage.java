@@ -3,8 +3,8 @@ package com.greennode.api_gateway.dto;
 import java.util.UUID;
 
 /**
- * The specific payload structure that will be serialized to JSON and pushed into the RabbitMQ
- * queue. The Go workers will deserialize this.
+ * The payload structure that will be serialized to JSON and written to the outbox table.
+ * Debezium CDC captures this event and publishes it to RabbitMQ for Go workers to consume.
  */
 public class JobMessage {
 

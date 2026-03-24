@@ -8,10 +8,11 @@
 
 This system is an asynchronous distributed task engine simulating long-running AI workloads.
 
-- A stateless **Java (Spring Boot) API Gateway** receives tasks and queues them.
+- A stateless **Java (Spring Boot) API Gateway** receives tasks and writes them to the database using the Outbox pattern.
+- **Debezium Server** implements Change Data Capture (CDC) to reliably publish outbox events from PostgreSQL to RabbitMQ.
 - **RabbitMQ** handles message brokering and dead-letter routing.
 - **Go (Golang) Worker Nodes** consume messages concurrently, process them, and update the database.
-- **PostgreSQL** serves as the single source of truth for job states.
+- **PostgreSQL** serves as the single source of truth for job states and outbox events.
 
 ## **2\. Specific, Concrete Rules for LLMs**
 
@@ -40,6 +41,7 @@ This system is an asynchronous distributed task engine simulating long-running A
 
 ## **4\. Architectural Decisions (Do Not Violate)**
 
+- **Transactional Outbox & CDC:** The API Gateway MUST use the outbox pattern. State changes and outbox events must be written to PostgreSQL within a single local transaction. Debezium Server tails the PostgreSQL WAL and guarantees at-least-once delivery to RabbitMQ. Do NOT publish directly to RabbitMQ from the API Gateway.
 - **Idempotency:** Go workers MUST check if a job is already in a `COMPLETED` or `PROCESSING` state before executing it. Messages may be delivered more than once by RabbitMQ.
 - **Stateless Gateway:** The Java Spring Boot application must maintain zero in-memory state regarding the jobs. All state lives in PostgreSQL.
 - **Connection Pooling:** Java must use HikariCP with a strict maximum pool size (e.g., 10\) to prevent PostgreSQL connection exhaustion under load.
