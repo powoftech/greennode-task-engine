@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	"greennode/worker-node/internal/db"
@@ -43,6 +45,21 @@ func New(database *db.Database) (*Processor, error) {
 		return nil, fmt.Errorf("failed to open a channel: %w", err)
 	}
 
+	concurrencyStr := getEnv("WORKER_CONCURRENCY", "10")
+	concurrency, err := strconv.Atoi(concurrencyStr)
+	if err != nil || concurrency < 1 {
+		concurrency = 10
+	}
+
+	err = ch.Qos(
+		concurrency, // prefetch count
+		0,           // prefetch size
+		false,       // global
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set QoS: %w", err)
+	}
+
 	log.Println("Connected to RabbitMQ successfully")
 	return &Processor{dbConn: database, rmqConn: conn, channel: ch}, nil
 }
@@ -64,9 +81,24 @@ func (p *Processor) Start() error {
 
 	log.Println("Worker is waiting for messages...")
 
-	for d := range msgs {
-		p.processMessage(d)
+	concurrencyStr := getEnv("WORKER_CONCURRENCY", "10")
+	concurrency, err := strconv.Atoi(concurrencyStr)
+	if err != nil || concurrency < 1 {
+		concurrency = 10
 	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for d := range msgs {
+				p.processMessage(d)
+			}
+		}(i)
+	}
+
+	wg.Wait()
 
 	return nil
 }
