@@ -13,7 +13,7 @@
     <artifactId>api-gateway</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>api-gateway</name>
-    <description>API Gateway for AI Task Engine</description>
+    <description>API Gateway</description>
     <url />
     <licenses>
         <license>

@@ -18,8 +18,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Orchestrates the core business logic. Uses the Transactional Outbox Pattern
- * with Debezium CDC to
+ * Orchestrates the core business logic. Uses the Transactional Outbox Pattern with Debezium CDC to
  * ensure atomicity between database writes and message publishing.
  */
 @Service
@@ -45,19 +44,18 @@ public class JobService {
     }
 
     /**
-     * Submits a new job using the Transactional Outbox Pattern with Debezium
-     * CDC. @Transactional
-     * ensures that both the Job and OutboxEvent are written atomically. Debezium
-     * captures the
+     * Submits a new job using the Transactional Outbox Pattern with Debezium CDC. @Transactional
+     * ensures that both the Job and OutboxEvent are written atomically. Debezium captures the
      * outbox insert via CDC and publishes to RabbitMQ, preventing race conditions.
      */
     @Transactional
     public Job submitJob(JobRequest request) {
         UUID jobId = UUID.randomUUID();
 
-        String currentTraceId = tracer.currentSpan() != null
-                ? tracer.currentSpan().context().traceId()
-                : "no-trace-id";
+        String currentTraceId =
+                tracer.currentSpan() != null
+                        ? tracer.currentSpan().context().traceId()
+                        : "no-trace-id";
 
         Job job = new Job(jobId, request.getTaskType(), JobStatus.PENDING);
         job = jobRepository.save(job);
@@ -67,19 +65,18 @@ public class JobService {
                 currentTraceId);
 
         try {
-            JobMessage message = new JobMessage(
-                    jobId,
-                    request.getTaskType(),
-                    request.getComplexity(),
-                    currentTraceId);
+            JobMessage message =
+                    new JobMessage(
+                            jobId, request.getTaskType(), request.getComplexity(), currentTraceId);
             String messageJson = jsonMapper.writeValueAsString(message);
 
-            OutboxEvent event = new OutboxEvent(
-                    jobId.toString(), // aggregate_id
-                    "JOB", // aggregate_type
-                    "JOB_CREATED", // type
-                    messageJson // payload
-            );
+            OutboxEvent event =
+                    new OutboxEvent(
+                            jobId.toString(), // aggregate_id
+                            "JOB", // aggregate_type
+                            "JOB_CREATED", // type
+                            messageJson // payload
+                            );
             outboxEventRepository.save(event);
             log.info("Persisted outbox event [{}] for job [{}]", event.getId(), jobId);
         } catch (JacksonException e) {
